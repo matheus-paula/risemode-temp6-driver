@@ -1,6 +1,7 @@
 import hid
 import time
 import psutil
+import sys
 
 VENDOR_ID = 0x1a2c
 PRODUCT_ID = 0x4984
@@ -10,9 +11,6 @@ def get_cpu_temp():
     for sensor in ['coretemp', 'k10temp', 'zenpower']:
         if sensor in temps:
             return temps[sensor][0].current
-            
-    if temps:
-        return list(temps.values())[0][0].current
     return 0
 
 def get_cpu_usage():
@@ -20,45 +18,47 @@ def get_cpu_usage():
 
 def split_digits(value):
     val = int(value)
-    if val > 99: 
-        val = 99 
+    if val > 99: val = 99
     return [(val // 10) % 10, val % 10]
 
+def open_device():
+    paths = [b'1-2.4:1.0', b'1-2.4:1.1']
+    for path in paths:
+        try:
+            device = hid.device()
+            device.open_path(path)
+            device.set_nonblocking(True)
+            print(f"Successfully opened: {path}")
+            return device
+        except Exception as e:
+            print(f"Could not open {path}: {e}")
+    return None
+
 def main():
-    device = hid.device()
+    time.sleep(10)
+    device = open_device()
+    if not device:
+        print("CRITICAL: Device not found.")
+        sys.exit(1)
+
     try:
-        device.open(VENDOR_ID, PRODUCT_ID)
-        
-        init_packet = [0x07, 0xFD] + [0x00] * 62
-        device.write(init_packet)
-        time.sleep(0.05)
-        
-        psutil.cpu_percent(interval=None) 
+        device.write([0x07, 0xFD] + [0x00] * 62)
         
         while True:
             temp = get_cpu_temp()
             usage = get_cpu_usage()
+            t_d = split_digits(temp)
+            u_d = split_digits(usage)
             
-            temp_digits = split_digits(temp)
-            usage_digits = split_digits(usage)
+            packet = [0] * 65
+            packet[0] = 0x07
+            packet[2], packet[3] = t_d[0], t_d[1]
+            packet[6], packet[7] = u_d[0], u_d[1]
             
-            data_packet = [0] * 65
-            data_packet[0] = 0x07  
-            data_packet[1] = 0               
-            data_packet[2] = temp_digits[0]  
-            data_packet[3] = temp_digits[1]  
-            data_packet[4] = 0x00            
-            data_packet[5] = 0               
-            data_packet[6] = usage_digits[0] 
-            data_packet[7] = usage_digits[1] 
-            
-            device.write(data_packet)
+            device.write(packet)
             time.sleep(1)
-            
-    except IOError:
-        pass
-    except KeyboardInterrupt:
-        pass
+    except Exception as e:
+        print(f"Runtime error: {e}")
     finally:
         device.close()
 

@@ -3,11 +3,15 @@ Description=Rise Mode Cooler Hardware Monitor
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /home/%u/cooler_monitor.py
-WorkingDirectory=/home/%u/
+CapabilityBoundingSet=CAP_SYS_RAWIO
+AmbientCapabilities=CAP_SYS_RAWIO
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /opt/cooler-monitor/cooler_monitor.py
+WorkingDirectory=/opt/cooler-monitor/
 Restart=always
-User=%u
-Group=%u
+RestartSec=10
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
