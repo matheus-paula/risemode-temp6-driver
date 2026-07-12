@@ -1,0 +1,14 @@
+[Unit]
+Description=Rise Mode Cooler Hardware Monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/%u/cooler_monitor.py
+WorkingDirectory=/home/%u/
+Restart=always
+User=%u
+Group=%u
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
