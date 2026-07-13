@@ -1,9 +1,7 @@
 import hid
 import time
 import psutil
-import sys
 import json
-import glob
 
 VENDOR_ID = 0x1a2c
 PRODUCT_ID = 0x4984
@@ -12,7 +10,7 @@ last_energy = None
 last_time = None
 
 def load_config():
-    default = {"temp_unit": "C", "metric_type": "power"}
+    default = {"temp_unit": "C", "metric_type": "usage"}
     try:
         with open("/opt/cooler-monitor/config.json", "r") as f:
             return json.load(f)
@@ -75,24 +73,46 @@ def open_device():
             pass
     return None
 
+def update_hardware_indicators(device, temp_unit, metric_type):
+    """
+    Sends the encrypted SET_REPORT payload to change the hardware LEDs.
+    """
+    mode_payloads = {
+        ("F", "usage"): [0x07, 0x01, 0x00, 0x02, 0x11, 0x00, 0x00, 0x03],
+        ("C", "usage"): [0x07, 0x00, 0x03, 0x06, 0x10, 0x00, 0x00, 0x02],
+        ("F", "power"): [0x07, 0x00, 0x09, 0x06, 0x01, 0x00, 0x00, 0x08],
+        ("C", "power"): [0x07, 0x00, 0x03, 0x07, 0x00, 0x00, 0x00, 0x09]
+    }
+    
+    sequence = mode_payloads.get((temp_unit, metric_type), mode_payloads[("C", "power")])
+    payload = sequence + [0x00] * (65 - len(sequence))
+    
+    try:
+        device.send_feature_report(payload)
+        print(f"[*] Hardware indicators set via Control Transfer: {temp_unit} / {metric_type}", flush=True)
+    except Exception as e:
+        print(f"[!] Failed to update indicators: {e}", flush=True)
+
 def main():
     time.sleep(10)
     device = open_device()
     if not device:
         print("CRITICAL: Device not found.")
-        sys.exit(1)
 
     try:
         device.write([0x07, 0xFD] + [0x00] * 62)
-        
+        time.sleep(0.1)
+
         while True:
             config = load_config()
-            temp = get_cpu_temp()
+            temp_unit = config.get("temp_unit", "C")
+            metric_type = config.get("metric_type", "power")
             
-            if config.get("temp_unit", "C") == "F":
+            temp = get_cpu_temp()
+            if temp_unit == "F":
                 temp = (temp * 9/5) + 32
                 
-            if config.get("metric_type", "power") == "power":
+            if metric_type == "power":
                 bottom_val = get_cpu_power()
             else:
                 bottom_val = get_cpu_usage()
@@ -100,29 +120,30 @@ def main():
             t_d = split_3_digits(temp)
             b_d = split_3_digits(bottom_val)
             
-            print(f"DEBUG LOG -> Temp: {temp} | Bottom Metric: {bottom_val}", flush=True)
+            print(f"DEBUG LOG -> Temp: {int(temp)} | Bottom Metric: {bottom_val}", flush=True)
             
             packet = [0] * 65
             packet[0] = 0x07
             
-            packet[1] = t_d[0]
+            packet[1] = 0x00
             packet[2] = t_d[1]
             packet[3] = t_d[2]
             
-            if config.get("temp_unit", "C") == "C":
-                packet[4] = 0x02
-            else:
+            if temp_unit == "C" and metric_type == "usage":
+                packet[4] = 0x10
+                packet[7] = b_d[2]
+            elif temp_unit == "F" and metric_type == "usage":
+                packet[1] = 0x01
+                packet[4] = 0x11
+                packet[7] = b_d[2]
+            elif temp_unit == "F" and metric_type == "power":
+                packet[3] = 0x06
                 packet[4] = 0x01
-                
-            packet[5] = b_d[0]
-            packet[6] = b_d[1]
-            packet[7] = b_d[2]
-            
-            if config.get("metric_type", "power") == "power":
-                packet[8] = 0x01
+                packet[7] = 0x08  
             else:
-                packet[8] = 0x02
-            
+                packet[3] = 0x07
+                packet[7] = 0x09  
+
             device.write(packet)
             time.sleep(1)
             
@@ -130,6 +151,6 @@ def main():
         print(f"Runtime error: {e}")
     finally:
         device.close()
-
+        
 if __name__ == "__main__":
     main()
