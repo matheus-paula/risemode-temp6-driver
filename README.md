@@ -36,22 +36,6 @@ options usbhid quirks=0x1a2c:0x4984:0x04
 ```bash
 sudo update-initramfs -u
 ```
-## Disabling Auto-Driver Download
-The device may attempt to run a script at boot to download its standard Windows driver. To prevent this from happening, blacklist the identifier:
-```bash
-sudo nano /etc/modprobe.d/blacklist-cooler.conf
-```Jadd: 
-```bash
-options usbhid quirks=0x1a2c:0x4984:0x04
-``b
-f``bash
-sudo update-initramfs -u
-```J
-
-## Prerequisites
-- OS: Ubuntu 24.04 LTS (or similar Linux distribution) (Tested on Ubuntu 26.04 LTS)
-- Dependencies: `psutil`, `hidapi`
-
 
 ## Installation
 
