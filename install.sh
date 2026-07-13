@@ -28,10 +28,12 @@ if [ -f "cooler_monitor.py" ]; then
 fi
 
 if [ ! -f "/opt/cooler-monitor/config.json" ]; then
-    echo '{"temp_unit": "C", "metric_type": "power"}' > /opt/cooler-monitor/config.json
-    echo "[+] Default configuration created."
-else
-    echo "[!] config.json already exists. Skipping to preserve your settings."
+    echo '{
+    "temp_unit": "C",
+    "metric_type": "power",
+    "debug_mode": false
+}' > /opt/cooler-monitor/config.json
+    echo "[+] Default configuration created with debug_mode: false."
 fi
 
 cat <<EOF > /etc/systemd/system/cooler-monitor.service

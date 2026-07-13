@@ -10,7 +10,7 @@ last_energy = None
 last_time = None
 
 def load_config():
-    default = {"temp_unit": "C", "metric_type": "usage"}
+    default = {"temp_unit": "C", "metric_type": "usage", "debug_mode": False}
     try:
         with open("/opt/cooler-monitor/config.json", "r") as f:
             return json.load(f)
@@ -62,15 +62,17 @@ def split_3_digits(value):
     return [(val // 100) % 10, (val // 10) % 10, val % 10]
 
 def open_device():
-    paths = [b'1-2.4:1.0', b'1-2.4:1.1']
-    for path in paths:
-        try:
-            device = hid.device()
-            device.open_path(path)
-            device.set_nonblocking(True)
-            return device
-        except Exception:
-            pass
+    for device_dict in hid.enumerate():
+        if device_dict['vendor_id'] == VENDOR_ID and device_dict['product_id'] == PRODUCT_ID:
+            try:
+                device = hid.device()
+                device.open_path(device_dict['path'])
+                device.set_nonblocking(True)
+                print(f"[+] Device connected at: {device_dict['path'].decode()}")
+                return device
+            except Exception as e:
+                print(f"[!] Failed to open device at {device_dict['path']}: {e}")
+                continue
     return None
 
 def update_hardware_indicators(device, temp_unit, metric_type):
@@ -107,6 +109,7 @@ def main():
             config = load_config()
             temp_unit = config.get("temp_unit", "C")
             metric_type = config.get("metric_type", "power")
+            debug_mode = config.get("debug_mode", False)
             
             temp = get_cpu_temp()
             if temp_unit == "F":
@@ -120,7 +123,8 @@ def main():
             t_d = split_3_digits(temp)
             b_d = split_3_digits(bottom_val)
             
-            print(f"DEBUG LOG -> Temp: {int(temp)} | Bottom Metric: {bottom_val}", flush=True)
+            if debug_mode:
+                print(f"DEBUG LOG -> Temp: {int(temp)} | Bottom Metric: {bottom_val}", flush=True)
             
             packet = [0] * 65
             packet[0] = 0x07
