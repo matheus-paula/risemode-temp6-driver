@@ -2,6 +2,7 @@ import hid
 import time
 import psutil
 import json
+import os
 
 VENDOR_ID = 0x1a2c
 PRODUCT_ID = 0x4984
