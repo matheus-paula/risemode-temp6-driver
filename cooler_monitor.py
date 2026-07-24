@@ -188,24 +188,18 @@ def main():
             
             packet = [0] * 65
             packet[0] = 0x07
-            packet[1] = 0x00
+            
+            packet[1] = 0x01 if temp_unit == "F" else 0x00
             packet[2] = t_d[1]
             packet[3] = t_d[2]
             
-            if temp_unit == "C" and metric_type == "usage":
-                packet[4] = 0x10
+            if metric_type == "usage":
+                packet[4] = 0x11 if temp_unit == "F" else 0x10
                 packet[7] = b_d[2]
-            elif temp_unit == "F" and metric_type == "usage":
-                packet[1] = 0x01
-                packet[4] = 0x11
-                packet[7] = b_d[2]
-            elif temp_unit == "F" and metric_type == "power":
-                packet[3] = 0x06
-                packet[4] = 0x01
-                packet[7] = 0x08  
             else:
-                packet[3] = 0x07
-                packet[7] = 0x09  
+                packet[3] = 0x06 if temp_unit == "F" else 0x07
+                packet[4] = 0x01
+                packet[7] = b_d[2]
 
             device.write(packet)
             time.sleep(1)
