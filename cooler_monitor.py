@@ -16,7 +16,8 @@ def load_config():
     try:
         with open("/opt/cooler-monitor/config.json", "r") as f:
             return json.load(f)
-    except:
+    except Exception as e:
+        print(f"[!] Failed to load config.json: {e}")
         return default
 
 def get_cpu_temp():
@@ -132,23 +133,6 @@ def open_device():
                 
     return None
 
-def update_hardware_indicators(device, temp_unit, metric_type):
-    mode_payloads = {
-        ("F", "usage"): [0x07, 0x01, 0x00, 0x02, 0x11, 0x00, 0x00, 0x03],
-        ("C", "usage"): [0x07, 0x00, 0x03, 0x06, 0x10, 0x00, 0x00, 0x02],
-        ("F", "power"): [0x07, 0x00, 0x09, 0x06, 0x01, 0x00, 0x00, 0x08],
-        ("C", "power"): [0x07, 0x00, 0x03, 0x07, 0x00, 0x00, 0x00, 0x09]
-    }
-    
-    sequence = mode_payloads.get((temp_unit, metric_type), mode_payloads[("C", "power")])
-    payload = sequence + [0x00] * (65 - len(sequence))
-    
-    try:
-        device.send_feature_report(payload)
-        print(f"[*] Hardware indicators set via Control Transfer: {temp_unit} / {metric_type}", flush=True)
-    except Exception as e:
-        print(f"[!] Failed to update indicators: {e}", flush=True)
-
 def main():
     print("Starting cooler monitor service...")
     device = None
@@ -189,16 +173,25 @@ def main():
             packet = [0] * 65
             packet[0] = 0x07
             
-            packet[1] = 0x01 if temp_unit == "F" else 0x00
+            packet[1] = 0x00
             packet[2] = t_d[1]
             packet[3] = t_d[2]
+            packet[5] = b_d[0]  
+            packet[6] = b_d[1]
             
-            if metric_type == "usage":
-                packet[4] = 0x11 if temp_unit == "F" else 0x10
+            if temp_unit == "C" and metric_type == "usage":
+                packet[4] = 0x10
+                packet[7] = b_d[2]
+            elif temp_unit == "F" and metric_type == "usage":
+                packet[1] = 0x01
+                packet[4] = 0x11
+                packet[7] = b_d[2]
+            elif temp_unit == "F" and metric_type == "power":
+                packet[3] = 0x06
+                packet[4] = 0x01
                 packet[7] = b_d[2]
             else:
-                packet[3] = 0x06 if temp_unit == "F" else 0x07
-                packet[4] = 0x01
+                packet[3] = 0x07
                 packet[7] = b_d[2]
 
             device.write(packet)
